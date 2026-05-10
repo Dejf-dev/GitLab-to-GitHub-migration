@@ -6,6 +6,24 @@ import (
 	"os/exec"
 )
 
+func RemoveLargeFiles(repoPath string) error {
+	cmd := exec.Command(
+		"git",
+		"filter-repo",
+		"--strip-blobs-bigger-than",
+		"100M",
+	)
+
+	cmd.Dir = repoPath
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("filter-repo failed: %v\n%s", err, out)
+	}
+
+	return nil
+}
+
 func MirrorClone(url, path string) error {
 	cmd := exec.Command("git", "clone", "--mirror", url, path)
 

@@ -19,6 +19,7 @@ GitLab cloning and GitHub pushing are done via **SSH**.
 
 - Go 1.24.4+
 - Git installed
+- git-filter-repo
 - SSH access to GitLab and GitHub
 
 ---

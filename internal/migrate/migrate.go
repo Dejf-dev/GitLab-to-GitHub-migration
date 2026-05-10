@@ -1,9 +1,9 @@
 package migrate
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"gitlab-to-github-migration/internal/config"
 	"gitlab-to-github-migration/internal/git"
@@ -26,7 +26,7 @@ func Filter(projects []gitlab.Project, filter string) []gitlab.Project {
 
 	out := []gitlab.Project{}
 	for _, p := range projects {
-		if strings.Contains(strings.ToLower(p.Name), strings.ToLower(filter)) {
+		if p.Name == filter {
 			out = append(out, p)
 		}
 	}
@@ -47,7 +47,8 @@ func Run(
 	res := Result{}
 
 	for _, p := range projects {
-		path := filepath.Join(tmp, p.Path)
+		repoPath := fmt.Sprintf("%s-%d", p.Path, p.ID)
+		path := filepath.Join(tmp, repoPath)
 
 		log.Infof("Cloning project %s", p.Name)
 		if err := git.MirrorClone(p.SSHURLToRepo, path); err != nil {
@@ -56,15 +57,23 @@ func Run(
 			continue
 		}
 
-		log.Infof("Creating GitHub repository %s", p.Path)
-		if err := gh.CreateRepo(p.Path, p.Description); err != nil {
+		// cleanup large files
+		log.Infof("Cleaning large files in %s", p.Name)
+		if err := git.RemoveLargeFiles(path); err != nil {
+			log.Warnf("Skipping cleanup failed repo %s: %v", p.Name, err)
+			res.Failed = append(res.Failed, p.Name)
+			continue
+		}
+
+		log.Infof("Creating GitHub repository %s", repoPath)
+		if err := gh.CreateRepo(repoPath, p.Description); err != nil {
 			log.Error(err)
 			res.Failed = append(res.Failed, p.Name)
 			continue
 		}
 
 		log.Infof("Pushing project %s to GitHub", p.Name)
-		if err := git.MirrorPush(path, gh.RemoteURL(p.Path)); err != nil {
+		if err := git.MirrorPush(path, gh.RemoteURL(repoPath)); err != nil {
 			log.Error(err)
 			res.Failed = append(res.Failed, p.Name)
 			continue
